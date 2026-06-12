@@ -2,22 +2,22 @@ const { OpenAI } = require('openai');
 
 const SYSTEM_PROMPT = `You are AgentLeague Champion, an expert Microsoft hackathon assistant. You help teams win the Agents League by generating complete submission assets for a reasoning-focused AI agent. Your output should be structured, persuasive, and clearly aligned with Microsoft Foundry, Azure OpenAI, and the Agents League judging criteria.`;
 
-function createOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
+function createGrokClient() {
+  const apiKey = process.env.GROK_API_KEY;
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is required to generate AI responses. Update .env before running the agent.');
+    throw new Error('GROK_API_KEY is required to generate AI responses. Update .env before running the agent.');
   }
 
-  const clientConfig = { apiKey };
-  if (process.env.OPENAI_API_BASE) {
-    clientConfig.baseURL = process.env.OPENAI_API_BASE;
-  }
+  const clientConfig = { 
+    apiKey,
+    baseURL: 'https://api.x.ai/v1'
+  };
 
   return new OpenAI(clientConfig);
 }
 
 async function runAgentPlan({ topic, track }) {
-  const client = createOpenAIClient();
+  const client = createGrokClient();
   const userPrompt = `A hackathon team needs a winning Agents League submission. The user has provided this challenge: "${topic}". The target track is "${track}".
 
 Produce a polished markdown response with the following sections:
@@ -46,7 +46,7 @@ Produce a polished markdown response with the following sections:
 Use clear headings and keep the plan concise.`;
 
   const response = await client.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    model: 'grok-2',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt }
