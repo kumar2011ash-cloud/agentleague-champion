@@ -5,7 +5,6 @@ Analyzes code repositories and provides comprehensive quality reports
 import os
 import json
 from typing import Dict, List
-from openai import OpenAI
 from dotenv import load_dotenv
 from config import Config
 
@@ -19,10 +18,13 @@ class CodeQualityAgent:
         self.mock = Config.MOCK
         if not self.mock:
             Config.validate()
-            self.client = OpenAI(
-                api_key=Config.GROK_API_KEY,
-                base_url=Config.GROK_BASE_URL
-            )
+            # Use a lightweight HTTP client to call Grok-compatible endpoint
+            try:
+                from grok_client import GrokClient
+            except Exception:
+                raise RuntimeError("grok_client import failed. Ensure grok_client.py exists and dependencies (requests) are installed")
+
+            self.client = GrokClient(api_key=Config.GROK_API_KEY, base_url=Config.GROK_BASE_URL)
         else:
             self.client = None
         
@@ -139,22 +141,24 @@ Provide architectural recommendations."""
             return self._mock_response(prompt)
 
         try:
-            response = self.client.chat.completions.create(
+            messages = [
+                {"role": "system", "content": "You are an expert software engineer providing detailed code analysis."},
+                {"role": "user", "content": prompt}
+            ]
+            resp = self.client.create_chat_completion(
                 model=Config.GROK_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert software engineer providing detailed code analysis."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+                messages=messages,
                 temperature=Config.TEMPERATURE,
                 max_tokens=Config.MAX_TOKENS
             )
-            return response.choices[0].message.content
+            # Expecting an OpenAI-like response structure
+            choice = resp.get('choices', [{}])[0]
+            message = choice.get('message') or choice.get('text') or {}
+            if isinstance(message, dict):
+                return message.get('content', '')
+            if isinstance(choice.get('text'), str):
+                return choice.get('text')
+            return str(resp)
         except Exception as e:
             return f"Error analyzing code: {str(e)}"
 

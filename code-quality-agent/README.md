@@ -104,6 +104,9 @@ This will:
 Create `.env` file:
 ```
 GROK_API_KEY=your_grok_api_key_here
+GROK_MODEL=grok-beta # adjust to the correct model name provided by your Grok plan
+GROK_BASE_URL=https://api.x.ai/v1
+MOCK=true # set to false to enable live API calls (ensure GROK_API_KEY is set securely in your environment)
 ```
 
 ## 🔄 Future Enhancements
