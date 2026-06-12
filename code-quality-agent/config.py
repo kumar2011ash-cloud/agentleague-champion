@@ -16,6 +16,8 @@ class Config:
     # API Endpoints
     GROK_BASE_URL = "https://api.x.ai/v1"
     GROK_MODEL = "grok-beta"
+    # Use mock mode to avoid calling external APIs during demos
+    MOCK = os.getenv("MOCK", "false").lower() in ("1", "true", "yes")
     
     # Analysis Settings
     MAX_CODE_LENGTH = 10000  # Max characters to analyze

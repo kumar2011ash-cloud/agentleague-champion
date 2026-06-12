@@ -7,6 +7,7 @@ import json
 from typing import Dict, List
 from openai import OpenAI
 from dotenv import load_dotenv
+from config import Config
 
 load_dotenv()
 
@@ -14,14 +15,16 @@ class CodeQualityAgent:
     """Main orchestrator for code quality analysis"""
     
     def __init__(self):
-        self.grok_key = os.getenv("GROK_API_KEY")
-        if not self.grok_key:
-            raise ValueError("GROK_API_KEY not set in .env")
-        
-        self.client = OpenAI(
-            api_key=self.grok_key,
-            base_url="https://api.x.ai/v1"
-        )
+        # Use mock mode if configured
+        self.mock = Config.MOCK
+        if not self.mock:
+            Config.validate()
+            self.client = OpenAI(
+                api_key=Config.GROK_API_KEY,
+                base_url=Config.GROK_BASE_URL
+            )
+        else:
+            self.client = None
         
         # Define specialized agents
         self.agents = {
@@ -132,9 +135,12 @@ Provide architectural recommendations."""
     
     def _query_grok(self, prompt: str) -> str:
         """Query Grok API"""
+        if self.mock:
+            return self._mock_response(prompt)
+
         try:
             response = self.client.chat.completions.create(
-                model="grok-beta",
+                model=Config.GROK_MODEL,
                 messages=[
                     {
                         "role": "system",
@@ -145,12 +151,40 @@ Provide architectural recommendations."""
                         "content": prompt
                     }
                 ],
-                temperature=0.7,
-                max_tokens=1000
+                temperature=Config.TEMPERATURE,
+                max_tokens=Config.MAX_TOKENS
             )
             return response.choices[0].message.content
         except Exception as e:
             return f"Error analyzing code: {str(e)}"
+
+    def _mock_response(self, prompt: str) -> str:
+        """Return a canned response for demos when MOCK is enabled."""
+        # Basic heuristics to decide response type
+        if "Injection" in prompt or "injection" in prompt or "SQL" in prompt:
+            return (
+                "- Potential SQL injection where user input is interpolated into queries.\n"
+                "- Recommendation: Use parameterized queries or ORM parameter binding.\n"
+                "Severity: Critical"
+            )
+        if "performance" in prompt or "Time complexity" in prompt:
+            return (
+                "- Nested loops detected leading to O(n^2) complexity.\n"
+                "- Recommendation: Refactor algorithm to reduce nested iterations or use vectorized operations.\n"
+                "Estimated improvement: 5-20x depending on dataset.\n"
+            )
+        if "security" in prompt or "Authentication" in prompt:
+            return (
+                "- No authentication checks observed for sensitive operations.\n"
+                "- Recommendation: Enforce authN/authZ, validate inputs, and sanitize outputs.\n"
+                "Severity: High"
+            )
+        # Default mock reply
+        return (
+            "- Code looks like it needs improved error handling and clearer naming.\n"
+            "- Recommendation: Add try/except blocks around I/O and database calls, and use descriptive variable names.\n"
+            "- Consider adding unit tests for core logic.\n"
+        )
     
     def generate_report(self, analysis_results: Dict) -> str:
         """Generate a comprehensive markdown report"""
@@ -212,8 +246,8 @@ def calculate(x):
     # Generate report
     report = agent.generate_report(results)
     
-    # Save report
-    with open("code_quality_report.md", "w") as f:
+    # Save report (use UTF-8 encoding to support emojis and special chars)
+    with open("code_quality_report.md", "w", encoding="utf-8") as f:
         f.write(report)
     
     print("\n✅ Analysis complete! Report saved to code_quality_report.md")
