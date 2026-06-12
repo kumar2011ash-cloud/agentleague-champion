@@ -21,6 +21,29 @@ jobs:
         run: |
           cd code-quality-agent
           python run_on_repo.py ${GITHUB_REPOSITORY_OWNER} ${GITHUB_REPOSITORY##*/}
+      - name: Extract short summary from JSON report
+        id: extract
+        run: |
+          python - <<'PY'
+import json, sys
+try:
+    with open('code-quality-agent/repo_report.json','r',encoding='utf-8') as f:
+        j = json.load(f)
+except Exception as e:
+    print(f'failed to load json: {e}')
+    print('report_summary<<EOF' + '\n' + 'No report generated' + '\n' + 'EOF')
+    sys.exit(0)
+summary = []
+for item in j.get('summary',[]):
+    summary.append(f"- {item['area']}: {item['severity']} - {item['summary']}")
+out = '\n'.join(summary[:10])
+print('report_summary<<EOF')
+print(out)
+print('EOF')
+PY
+        env:
+          # ensure python is available
+          PATH: ${{ runner.path }}
       - name: Create or update PR comment with results
         uses: peter-evans/create-or-update-comment@v4
         with:
@@ -28,11 +51,9 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             ### Automated Code Quality Analysis
-            The automated analyzer ran and generated a report. See attached summary below.
+            The automated analyzer ran and generated a report. Summary:
 
-            ```
             ${{ steps.extract.outputs.report_summary }}
-            ```
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
         with:
