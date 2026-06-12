@@ -1,0 +1,40 @@
+name: Analyze PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r code-quality-agent/requirements.txt
+      - name: Run repository analysis (mock if GROK not set)
+        run: |
+          cd code-quality-agent
+          python run_on_repo.py ${GITHUB_REPOSITORY_OWNER} ${GITHUB_REPOSITORY##*/}
+      - name: Create or update PR comment with results
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ### Automated Code Quality Analysis
+            The automated analyzer ran and generated a report. See attached summary below.
+
+            ```
+            ${{ steps.extract.outputs.report_summary }}
+            ```
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-reports
+          path: code-quality-agent/*.md,code-quality-agent/*.json
