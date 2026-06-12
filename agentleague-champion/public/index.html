@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgentLeague Champion</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>AgentLeague Champion</h1>
+        <p>Generate submission-ready Agents League plans, architecture, and demo flows.</p>
+      </header>
+
+      <main>
+        <form id="agent-form">
+          <label for="topic">Hackathon problem or project idea</label>
+          <textarea id="topic" placeholder="Example: build an agent that summarizes meetings, generates pitch decks, and tracks deadlines" required></textarea>
+
+          <label for="track">Agents League track</label>
+          <select id="track" required>
+            <option value="Reasoning Agents">Reasoning Agents</option>
+            <option value="Creative Apps">Creative Apps</option>
+            <option value="Enterprise Agents">Enterprise Agents</option>
+          </select>
+
+          <button type="submit">Generate Project Plan</button>
+        </form>
+
+        <section id="result">
+          <h2>Project Plan</h2>
+          <pre id="output">Enter a problem statement and generate your agent plan.</pre>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
