@@ -9,53 +9,93 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+      
+      - name: Verify directory structure
+        run: |
+          if [ ! -d "code-quality-agent" ]; then
+            echo "ERROR: code-quality-agent directory not found"
+            exit 1
+          fi
+          if [ ! -f "code-quality-agent/requirements.txt" ]; then
+            echo "ERROR: requirements.txt not found"
+            exit 1
+          fi
+      
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r code-quality-agent/requirements.txt
-      - name: Run repository analysis (mock if GROK not set)
+      
+      - name: Run repository analysis
+        env:
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd code-quality-agent
-          python run_on_repo.py ${GITHUB_REPOSITORY_OWNER} ${GITHUB_REPOSITORY##*/}
+          python run_on_repo.py ${{ github.repository_owner }} ${{ github.event.repository.name }}
+        continue-on-error: true
+      
       - name: Extract short summary from JSON report
         id: extract
         run: |
           python - <<'PY'
-import json, sys
-try:
-    with open('code-quality-agent/repo_report.json','r',encoding='utf-8') as f:
-        j = json.load(f)
-except Exception as e:
-    print(f'failed to load json: {e}')
-    print('report_summary<<EOF' + '\n' + 'No report generated' + '\n' + 'EOF')
-    sys.exit(0)
-summary = []
-for item in j.get('summary',[]):
-    summary.append(f"- {item['area']}: {item['severity']} - {item['summary']}")
-out = '\n'.join(summary[:10])
-print('report_summary<<EOF')
-print(out)
-print('EOF')
-PY
-        env:
-          # ensure python is available
-          PATH: ${{ runner.path }}
+          import json
+          import sys
+          import os
+          
+          report_file = 'code-quality-agent/repo_report.json'
+          
+          if not os.path.exists(report_file):
+              print('report_summary<<EOF')
+              print('⚠️ No report generated')
+              print('EOF')
+              sys.exit(0)
+          
+          try:
+              with open(report_file, 'r', encoding='utf-8') as f:
+                  j = json.load(f)
+          except Exception as e:
+              print(f'failed to load json: {e}')
+              print('report_summary<<EOF')
+              print('No report generated')
+              print('EOF')
+              sys.exit(0)
+          
+          summary = []
+          for item in j.get('summary', []):
+              summary.append(f"- {item.get('area', 'Unknown')}: {item.get('severity', 'N/A')} - {item.get('summary', 'N/A')}")
+          
+          out = '\n'.join(summary[:10]) if summary else 'No summary available'
+          print('report_summary<<EOF')
+          print(out)
+          print('EOF')
+          PY
+        continue-on-error: true
+      
       - name: Create or update PR comment with results
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            ### Automated Code Quality Analysis
-            The automated analyzer ran and generated a report. Summary:
-
+            ### 🤖 Automated Code Quality Analysis
+            
+            #### Summary:
             ${{ steps.extract.outputs.report_summary }}
+        continue-on-error: true
+      
       - name: Upload reports as artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: code-quality-reports
-          path: code-quality-agent/*.md,code-quality-agent/*.json
+          path: |
+            code-quality-agent/repo_report.md
+            code-quality-agent/repo_report.json
+          retention-days: 30
+          if-no-files-found: warn
